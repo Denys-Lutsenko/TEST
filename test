@@ -1,0 +1,215 @@
+CREATE TABLE ContactInfo (
+                             ContactInfoID INT PRIMARY KEY NOT NULL,
+                             PhoneNumber VARCHAR(20) NOT NULL,
+                             Email VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Address (
+                         AddressID INT PRIMARY KEY NOT NULL,
+                         Street VARCHAR(200) NOT NULL,
+                         City VARCHAR(100) NOT NULL,
+                         PostalCode VARCHAR(20) NOT NULL,
+                         Country VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE Supplier (
+                          SupplierID INT PRIMARY KEY NOT NULL,
+                          Name VARCHAR(100) NOT NULL,
+                          ContactInfoID INT NOT NULL,
+                          FOREIGN KEY (ContactInfoID) REFERENCES ContactInfo(ContactInfoID)
+);
+CREATE TABLE Category (
+                          CategoryID INT PRIMARY KEY,
+                          CategoryName VARCHAR(255) NOT NULL,
+                          Description TEXT
+);
+
+CREATE TABLE Product (
+                         ProductID INT PRIMARY KEY,
+                         ProductName VARCHAR(255) NOT NULL,
+                         Description TEXT,
+                         Price DECIMAL(12, 2) NOT NULL,
+                         Quantity INT NOT NULL,
+                         Size VARCHAR(50),
+                         CountryCode CHAR(2),
+                         SeasonID INT
+);
+
+
+CREATE TABLE Season (
+                        SeasonID INT PRIMARY KEY NOT NULL,
+                        Name VARCHAR(50) NOT NULL UNIQUE,
+                        Description VARCHAR(500)
+);
+
+CREATE TABLE Warehouse (
+                           WarehouseID INT PRIMARY KEY NOT NULL,
+                           Name VARCHAR(100) NOT NULL,
+                           Location VARCHAR(200) NOT NULL,
+                           ContactInfoID INT NOT NULL,
+                           FOREIGN KEY (ContactInfoID) REFERENCES ContactInfo(ContactInfoID)
+);
+
+CREATE TABLE Inventory (
+                           InventoryID INT PRIMARY KEY NOT NULL,
+                           ProductID INT NOT NULL,
+                           WarehouseID INT NOT NULL,
+                           QuantityOnHand INT NOT NULL,
+                           FOREIGN KEY (ProductID) REFERENCES Product(ProductID),
+                           FOREIGN KEY (WarehouseID) REFERENCES Warehouse(WarehouseID)
+);
+
+CREATE TABLE PurchaseOrder (
+                               PurchaseOrderID INT PRIMARY KEY NOT NULL,
+                               SupplierID INT NOT NULL,
+                               OrderDate TIMESTAMP NOT NULL,
+                               ExpectedDeliveryDate TIMESTAMP NOT NULL,
+                               FOREIGN KEY (SupplierID) REFERENCES Supplier(SupplierID)
+);
+
+CREATE TABLE PurchaseOrderDetail (
+                                     PurchaseOrderDetailID INT PRIMARY KEY NOT NULL,
+                                     PurchaseOrderID INT NOT NULL,
+                                     ProductID INT NOT NULL,
+                                     Quantity INT NOT NULL,
+                                     Price DECIMAL(10,2) NOT NULL,
+                                     TotalPrice DECIMAL(12,2) NOT NULL,
+                                     FOREIGN KEY (PurchaseOrderID) REFERENCES PurchaseOrder(PurchaseOrderID),
+                                     FOREIGN KEY (ProductID) REFERENCES Product(ProductID)
+);
+
+-- Створити тригерну функцію для обчислення TotalPrice
+CREATE OR REPLACE FUNCTION calculate_purchase_order_detail_total_price()
+    RETURNS TRIGGER AS $$
+BEGIN
+    NEW.TotalPrice := NEW.Quantity * NEW.Price;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Створити тригер для виклику calculate_purchase_order_detail_total_price() при вставці та оновленні
+CREATE TRIGGER trigger_purchase_order_detail_total_price
+    BEFORE INSERT OR UPDATE ON PurchaseOrderDetail
+    FOR EACH ROW EXECUTE FUNCTION calculate_purchase_order_detail_total_price();
+
+
+
+CREATE TABLE Customer (
+                          CustomerID INT PRIMARY KEY,
+                          FirstName VARCHAR(50) NOT NULL,
+                          LastName VARCHAR(50) NOT NULL,
+                          Email VARCHAR(100) NOT NULL,
+                          PhoneNumber VARCHAR(20),
+                          Address TEXT,
+                          PostalCode VARCHAR(20),
+                          City VARCHAR(50) NOT NULL,
+                          Country VARCHAR(50) NOT NULL,
+                          CountryCode CHAR(2) NOT NULL
+);
+
+
+CREATE TABLE Orders (
+                        OrderID INT PRIMARY KEY NOT NULL,
+                        CustomerID INT NOT NULL,
+                        OrderDate TIMESTAMP NOT NULL,
+                        ShippingAddressID INT NOT NULL,
+                        TotalPrice DECIMAL(12,2) NOT NULL,
+                        FOREIGN KEY (CustomerID) REFERENCES Customer(CustomerID),
+                        FOREIGN KEY (ShippingAddressID) REFERENCES Address(AddressID)
+);
+
+
+CREATE TABLE OrderDetail (
+                             OrderDetailID INT PRIMARY KEY NOT NULL,
+                             OrderID INT NOT NULL,
+                             ProductID INT NOT NULL,
+                             Quantity INT NOT NULL,
+                             Price DECIMAL(10,2) NOT NULL,
+                             FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
+                             FOREIGN KEY (ProductID) REFERENCES Product(ProductID)
+);
+
+-- Додаю індекс для стовпців OrderID та ProductID
+CREATE INDEX idx_OrderDetail_OrderID ON OrderDetail (OrderID);
+CREATE INDEX idx_OrderDetail_ProductID ON OrderDetail (ProductID);
+
+
+
+INSERT INTO ContactInfo (ContactInfoID, PhoneNumber, Email) VALUES
+                                                                (1, '380991234567', 'valentin.kuznezow@gmail.com'),
+                                                                (2, '380961111111', 'irina.tocarc@gmail.com'),
+                                                                (3, '380673333333', 'genadii.albinos@gmail.com'),
+                                                                (4, '380994433444', 'mihiail.ostronos@gmail.com');
+
+
+INSERT INTO Address (AddressID, Street, City, PostalCode, Country) VALUES
+                                                                       (1, 'вул. Головна 123', 'Львів', '79000', 'Україна'),
+                                                                       (2, 'вул. Маршала 456', 'Київ', '01001', 'Україна'),
+                                                                       (3, 'вул. Дубова 789', 'Харків', '61000', 'Україна'),
+                                                                       (4, 'вул. Кленова 234', 'Одеса', '65000', 'Україна');
+
+INSERT INTO Supplier (SupplierID, Name, ContactInfoID) VALUES
+                                                           (1, 'RGT Ukraine ', 1),
+                                                           (2, 'Shveynoe Proyzvodstvo Cotto', 2),
+                                                           (3, 'Berry kids ', 3),
+                                                           (4, 'Repulo’s Tailors', 4);
+
+INSERT INTO Category (CategoryID, CategoryName, Description) VALUES
+                                                                 (1, 'Одежда', 'Различные виды одежды'),
+                                                                 (2, 'Обувь', 'Различные виды обуви');
+
+INSERT INTO Product (ProductID, ProductName, Description, Price, Quantity, Size, CountryCode) VALUES
+                                                                                                  (1, 'Футболка', 'Маленька футболка', 10.00, 100, 'S', 'US'),
+                                                                                                  (2, 'Светр', 'Корисний светр', 25.00, 50, 'M', 'CA'),
+                                                                                                  (3, 'Пальто', 'Таємниче пальто', 50.00, 25, 'L', 'JP'),
+                                                                                                  (4, 'Куртка', 'Елегантна куртка', 100.00, 10, 'XL', 'CN');
+INSERT INTO Season (SeasonID, Name) VALUES
+                                        (1, 'Весна'),
+                                        (2, 'Літо'),
+                                        (3, 'Осінь'),
+                                        (4, 'Зима');
+
+INSERT INTO Warehouse (WarehouseID, Name, Location, ContactInfoID) VALUES
+                                                                       (1, 'Основний склад', 'вул. Дубова 123, Львів, Україна', 1),
+                                                                       (2, 'Другорядний склад', 'вул. Кленова 456, Київ, Україна', 2),
+                                                                       (3, 'Третинний склад', 'вул. Головна 789, Харків, Україна', 3),
+                                                                       (4, 'Склад переповнення', 'вул. Маршала 234, Одеса, Україна', 4);
+
+INSERT INTO Inventory (InventoryID, ProductID, WarehouseID, QuantityOnHand) VALUES
+                                                                                (1, 1, 1, 50),
+                                                                                (2, 1, 2, 25),
+                                                                                (3, 2, 3, 10),
+                                                                                (4, 3, 4, 5);
+
+INSERT INTO PurchaseOrder (PurchaseOrderID, SupplierID, OrderDate, ExpectedDeliveryDate) VALUES
+                                                                                             (1, 1, '2023-01-01 10:00:00', '2023-01-15 10:00:00'),
+                                                                                             (2, 2, '2023-02-02 10:00:00', '2023-02-16 10:00:00'),
+                                                                                             (3, 3, '2023-03-03 10:00:00', '2023-03-17 10:00:00'),
+                                                                                             (4, 1, '2023-04-04 10:00:00', '2023-04-18 10:00:00'),
+                                                                                             (5, 4, '2023-05-05 10:00:00', '2023-05-19 10:00:00');
+
+ALTER TABLE Product
+    ADD CONSTRAINT FK_Product_Season FOREIGN KEY (SeasonID) REFERENCES Season(SeasonID);
+ALTER TABLE OrderDetail ADD TotalPrice DECIMAL(12, 2) NOT NULL;
+
+UPDATE ContactInfo SET Email = 'newe@gmail.com' WHERE ContactInfoID = 1;
+-- оновлення адреси електронної пошти клієнта або користувача бази даних
+
+UPDATE OrderDetail SET TotalPrice = Quantity * Price;
+ALTER TABLE Product ADD CategoryID INT;
+UPDATE Product SET CategoryID = 2;
+UPDATE Product SET CategoryID = 3;
+
+UPDATE Product SET Price = Price * 1.1 WHERE ProductID IN (SELECT ProductID FROM Product WHERE CategoryID = 2);
+-- збільшую ціну на всі товари в категорії з CategoryID 2 на 10%
+
+DELETE Product SET Price = Price * 1.1 WHERE ProductID IN (SELECT ProductID FROM Product WHERE CategoryID = 2);
+-- знижую ціну на всі товари в категорії з CategoryID 2 на 10%
+
+SELECT * FROM Product WHERE Price > 100;
+-- роблю вибірку даних вибираю всі стовпці з таблиці Product де ціна більша 100
+
+
+
+
+
